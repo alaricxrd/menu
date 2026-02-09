@@ -1,10 +1,3 @@
--- // GENERATING RANDOM IDENTITY FOR BYPASS
-local function GetRandomName()
-    local s = ""
-    for i = 1, 15 do s = s .. string.char(math.random(97, 122)) end
-    return s
-end
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -25,9 +18,11 @@ local Settings = {
     God9999 = false, GodNoDamage = false
 }
 
--- // DRAWINGS (BYPASS)
+-- // DRAWINGS
 local FovCircle = Drawing.new("Circle")
-FovCircle.Thickness = 1; FovCircle.Color = Color3.fromRGB(0, 255, 150); FovCircle.Transparency = 0.5
+FovCircle.Thickness = 1.5; FovCircle.Color = Color3.fromRGB(0, 170, 255); FovCircle.Transparency = 0.8
+local CrosshairL1 = Drawing.new("Line"); CrosshairL1.Thickness = 2; CrosshairL1.Color = Color3.new(1,0,0)
+local CrosshairL2 = Drawing.new("Line"); CrosshairL2.Thickness = 2; CrosshairL2.Color = Color3.new(1,0,0)
 
 local ESP_Cache = {}
 local lastShot = 0
@@ -45,11 +40,11 @@ end
 -- // ESP MOTORU
 local function StartESP(obj)
     if ESP_Cache[obj] or obj == LocalPlayer.Character then return end
-    local box = Drawing.new("Square"); box.Thickness = 1
-    local name = Drawing.new("Text"); name.Size = 13; name.Outline = true; name.Center = true
+    local box = Drawing.new("Square"); box.Thickness = 1.5
+    local name = Drawing.new("Text"); name.Size = 14; name.Outline = true; name.Center = true; name.Font = 2
     local boneLines = {}
     local Bones = {{"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"}, {"Head", "Torso"}, {"Torso", "Left Arm"}, {"Torso", "Right Arm"}, {"LowerTorso", "Left Leg"}, {"LowerTorso", "Right Leg"}}
-    for i = 1, #Bones do boneLines[i] = Drawing.new("Line"); boneLines[i].Thickness = 1 end
+    for i = 1, #Bones do boneLines[i] = Drawing.new("Line"); boneLines[i].Thickness = 1.2 end
 
     local Connection
     Connection = RunService.RenderStepped:Connect(function()
@@ -77,51 +72,70 @@ local function StartESP(obj)
     ESP_Cache[obj] = true
 end
 
--- // CORE ENGINE (STEALTH MODE)
-RunService.Heartbeat:Connect(function(delta)
+-- // CORE ENGINE
+RunService.RenderStepped:Connect(function()
     local Char = LocalPlayer.Character
     local Root = Char and Char:FindFirstChild("HumanoidRootPart")
     local Hum = Char and Char:FindFirstChildOfClass("Humanoid")
     
-    -- // STEALTH GOD MODE (Fluctuating Health)
+    -- // GOD MODES
     if Hum then
-        if Settings.God9999 then Hum.MaxHealth = 9e9; Hum.Health = 9e9 end
-        if Settings.GodNoDamage and Hum.Health < 20 and Hum.Health > 0 then 
-            Hum.Health = math.random(85, 95) -- 100 yapmaz ki loglara takılmasın
-        end
+        if Settings.God9999 then Hum.MaxHealth = 999999; Hum.Health = 999999 end
+        if Settings.GodNoDamage and Hum.Health < 100 and Hum.Health > 0 then Hum.Health = 100 end
     end
 
-    -- // STEALTH SPEED (CFrame Push instead of WalkSpeed)
-    if Settings.SpeedEnabled and Root and Hum and Hum.MoveDirection.Magnitude > 0 then
-        Root.CFrame = Root.CFrame + (Hum.MoveDirection * (Settings.WalkSpeed / 50))
-    end
-
-    -- // THIRD PERSON OVERRIDE
+    -- // THIRD PERSON FIX (OVERRIDE)
     if Settings.ThirdPerson then
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+        -- Oyunun zoom'u sıfırlamasını engellemek için min ve max'ı kilitliyoruz
         LocalPlayer.CameraMaxZoomDistance = Settings.TP_Distance
         LocalPlayer.CameraMinZoomDistance = Settings.TP_Distance
         if Char then
             for _, v in pairs(Char:GetDescendants()) do
-                if v:IsA("BasePart") then v.LocalTransparencyModifier = 0 end
+                if (v:IsA("BasePart") or v:IsA("Decal")) and v.Name ~= "HumanoidRootPart" then
+                    v.LocalTransparencyModifier = 0 -- Silah çekince karakterin silinmesini engeller
+                end
             end
+        end
+    else
+        -- Kapatıldığında varsayılan değerlere dön (opsiyonel)
+        if LocalPlayer.CameraMaxZoomDistance == Settings.TP_Distance then
+            LocalPlayer.CameraMaxZoomDistance = 128
+            LocalPlayer.CameraMinZoomDistance = 0.5
         end
     end
 
-    -- // SHIFT LOCK & SPIN
+    -- // SHIFT LOCK & SPIN SYNC
     if Settings.ShiftLock then
         UserInputService.MouseBehavior = Enum.MouseBehavior.LockCenter
         if Root and not Settings.SpinBot then
-            Root.CFrame = CFrame.new(Root.Position, Root.Position + Vector3.new(Camera.CFrame.LookVector.X, 0, Camera.CFrame.LookVector.Z))
+            local lookAt = Vector3.new(Camera.CFrame.LookVector.X, 0, Camera.CFrame.LookVector.Z)
+            Root.CFrame = CFrame.new(Root.Position, Root.Position + lookAt)
         end
+    elseif not Settings.ShiftLock and UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     end
 
     if Settings.SpinBot and Root then
         Root.CFrame = Root.CFrame * CFrame.Angles(0, math.rad(Settings.SpinSpeed), 0)
     end
-end)
 
--- // AIMBOT & FOV ENGINE
-RunService.RenderStepped:Connect(function()
+    if Settings.SpeedEnabled and Hum then Hum.WalkSpeed = Settings.WalkSpeed end
+
+    -- // ADMIN FLY
+    if Settings.Fly and Root and Hum then
+         Hum.PlatformStand = true
+         local fv = Vector3.new(0,0,0)
+         if UserInputService:IsKeyDown(Enum.KeyCode.W) then fv = fv + Camera.CFrame.LookVector end
+         if UserInputService:IsKeyDown(Enum.KeyCode.S) then fv = fv - Camera.CFrame.LookVector end
+         if UserInputService:IsKeyDown(Enum.KeyCode.A) then fv = fv - Camera.CFrame.RightVector end
+         if UserInputService:IsKeyDown(Enum.KeyCode.D) then fv = fv + Camera.CFrame.RightVector end
+         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then fv = fv + Vector3.new(0,1,0) end
+         if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then fv = fv - Vector3.new(0,1,0) end
+         Root.Velocity = fv.Magnitude > 0 and fv.Unit * Settings.FlySpeed or Vector3.new(0,0,0)
+    elseif Hum then Hum.PlatformStand = false end
+
+    -- // AIMBOT ENGINE
     FovCircle.Visible = Settings.FovEnabled and Settings.FovVisible
     FovCircle.Radius = Settings.FovRadius
     FovCircle.Position = UserInputService:GetMouseLocation()
@@ -130,7 +144,7 @@ RunService.RenderStepped:Connect(function()
         local visT, closeT, minV, minC = nil, nil, math.huge, Settings.AimDistance
         for obj, _ in pairs(ESP_Cache) do
             local oHrp = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Torso")
-            if oHrp and obj:FindFirstChildOfClass("Humanoid").Health > 0 then
+            if oHrp and obj.Humanoid.Health > 0 then
                 local d = (oHrp.Position - Camera.CFrame.Position).Magnitude
                 if d <= Settings.AimDistance then
                     local p = obj:FindFirstChild(Settings.AimPart) or oHrp
@@ -155,10 +169,10 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- // UI (ANTI-DETECTION SETUP)
-local SG = Instance.new("ScreenGui", game:GetService("CoreGui")); SG.Name = GetRandomName()
-local Main = Instance.new("Frame", SG); Main.Name = GetRandomName(); Main.Size = UDim2.new(0, 520, 0, 530); Main.Position = UDim2.new(0.5, -260, 0.5, -265); Main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); Main.Visible = false; Instance.new("UICorner", Main); Instance.new("UIStroke", Main).Color = Color3.fromRGB(80,80,80)
-local Header = Instance.new("TextLabel", Main); Header.Text = "BABALAR V2.19 [STEALTH]"; Header.Size = UDim2.new(1,0,0,50); Header.BackgroundTransparency = 1; Header.TextColor3 = Color3.new(1,1,1); Header.Font = "GothamBold"; Header.TextSize = 20
+-- // UI (KORUNAN MENÜ VE ÖZELLİKLER)
+local SG = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local Main = Instance.new("Frame", SG); Main.Size = UDim2.new(0, 520, 0, 530); Main.Position = UDim2.new(0.5, -260, 0.5, -265); Main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); Main.Visible = false; Instance.new("UICorner", Main); Instance.new("UIStroke", Main).Color = Color3.fromRGB(80,80,80)
+local Header = Instance.new("TextLabel", Main); Header.Text = "BABALAR V2.18 FINAL STABLE"; Header.Size = UDim2.new(1,0,0,50); Header.BackgroundTransparency = 1; Header.TextColor3 = Color3.new(1,1,1); Header.Font = "GothamBold"; Header.TextSize = 20
 
 function AddTog(txt, page, var)
     local btn = Instance.new("TextButton", page); btn.Size = UDim2.new(1, -10, 0, 32); btn.BackgroundTransparency = 1; btn.Text = ""
@@ -210,4 +224,4 @@ UserInputService.InputChanged:Connect(function(i) if i.UserInputType == Enum.Use
 UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d = false end end)
 
 Pages.Aimbot.Visible = true
-task.spawn(function() while task.wait(2) do for _, v in pairs(workspace:GetDescendants()) do if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and v ~= LocalPlayer.Character and not ESP_Cache[v] then StartESP(v) end end end end)
+task.spawn(function() while task.wait(1) do for _, v in pairs(workspace:GetDescendants()) do if v:IsA("Model") and v:FindFirstChildOfClass("Humanoid") and v ~= LocalPlayer.Character and not ESP_Cache[v] then StartESP(v) end end end end)
